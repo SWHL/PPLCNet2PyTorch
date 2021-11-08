@@ -91,7 +91,7 @@ class DepthwiseSeparable(nn.Module):
         self.use_se = use_se
 
         self.dw_conv = ConvBNLayer(num_channels=num_channels,
-                                   num_filters=num_filters,
+                                   num_filters=num_channels,
                                    filter_size=dw_size,
                                    stride=stride,
                                    num_groups=num_channels)
@@ -194,7 +194,7 @@ class PyTorchLCNet(nn.Module):
 
         self.hard_swish = nn.Hardswish()
         self.dropout = nn.Dropout(p=dropout_prob)
-        self.flatten = nn.Flatten(start_dim=1, end_dim=1)
+        self.flatten = nn.Flatten(start_dim=1, end_dim=-1)
 
         self.fc = nn.Linear(self.class_expand, class_num)
 
@@ -209,7 +209,7 @@ class PyTorchLCNet(nn.Module):
 
         x = self.avg_pool(x)
         x = self.last_conv(x)
-        x = self.hardswish(x)
+        x = self.hard_swish(x)
         x = self.dropout(x)
         x = self.flatten(x)
         x = self.fc(x)
@@ -233,7 +233,7 @@ def PyTorchLCNet_x1_0(pretrained=False, use_ssld=False, **kwargs):
 
 if __name__ == '__main__':
     x = torch.randn(1, 3, 224, 224)
-    model = PyTorchLCNet_x1_0()
+    model = PyTorchLCNet_x1_0(class_num=1000)
 
     y = model(x)
     print(y.shape)
