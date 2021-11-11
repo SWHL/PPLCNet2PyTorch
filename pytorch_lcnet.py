@@ -1,8 +1,13 @@
 # -*- encoding: utf-8 -*-
 # @Author: SWHL
 # @Contact: liekkaskono@163.com
+import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+from utils import (CropImage, DecodeImage, NormalizeImage, ResizeImage,
+                   ToCHWImage)
 
 NET_CONFIG = {
     #           k, in_c, out_c, s, use_se
@@ -216,7 +221,8 @@ class PyTorchLCNet(nn.Module):
         return x
 
 
-def PyTorchLCNet_x1_0(pretrained=False, use_ssld=False, **kwargs):
+def PyTorchLCNet_x1_0(pretrained=False, use_ssld=False,
+                      pretrained_path=None, **kwargs):
     """
     PyTorchLCNet_x1_0
     Args:
@@ -227,13 +233,52 @@ def PyTorchLCNet_x1_0(pretrained=False, use_ssld=False, **kwargs):
         model: nn.Layer. Specific `PPLCNet_x1_0` model depends on args.
     """
     model = PyTorchLCNet(scale=1.0, **kwargs)
-    # _load_pretrained(pretrained, model, MODEL_URLS["PPLCNet_x1_0"], use_ssld)
+    if pretrained:
+        state_dict = torch.load(pretrained_path)
+        model.load_state_dict(state_dict)
     return model
 
 
 if __name__ == '__main__':
-    x = torch.randn(1, 3, 224, 224)
-    model = PyTorchLCNet_x1_0(class_num=1000)
+    decode_img = DecodeImage(to_rgb=True, channel_first=False)
+    resize_img = ResizeImage(resize_short=256)
+    crop_img = CropImage(size=224)
 
-    y = model(x)
-    print(y.shape)
+    scale = 1 / 255.0
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
+
+    normalize_img = NormalizeImage(scale, mean, std, order='')
+
+    to_chw_img = ToCHWImage()
+
+    img_path = 'images/n01440764_9780.JPEG'
+    with open(img_path, 'rb') as f:
+        x = f.read()
+
+    x = decode_img(x)
+    x = resize_img(x)
+    x = crop_img(x)
+    x = normalize_img(x)
+    x = to_chw_img(x)
+
+    batch_data = []
+    batch_data.append(x)
+    batch_tensor = torch.Tensor(np.array(batch_data))
+
+    with open('images/imagenet1k_label_list.txt', 'r', encoding='utf-8') as f:
+        label_list = f.readlines()
+
+    model_path = 'pretrained_models/PPLCNet_x1_0_pretrained.pth'
+    model = PyTorchLCNet_x1_0(pretrained=True,
+                              pretrained_path=model_path,
+                              class_num=1000)
+    model.eval()
+
+    y = model(batch_tensor)
+    y = F.softmax(y, dim=-1)
+    y = y.detach().numpy()
+    probs = y[0]
+    index = probs.argsort(axis=0)[-1:][::-1][0]
+    score = probs[index]
+    print(f'{label_list[index].strip()}: {score}')
