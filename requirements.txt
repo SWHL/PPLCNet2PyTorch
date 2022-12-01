@@ -1,5 +1,5 @@
 numpy>=1.22
 opencv_python==4.5.3.56
-paddlepaddle==2.2.0
+paddlepaddle
 six==1.16.0
 torch==1.10.0+cpu
